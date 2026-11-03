@@ -3,23 +3,34 @@
  * create-agentic-playwright — scaffold a new Agentic Playwright project.
  *
  * Usage:
- *   npm create agentic-playwright my-tests            # interactive (4 questions)
- *   npm create agentic-playwright my-tests -- --demo  # zero questions, demo API, smoke run
- *   npm create agentic-playwright my-tests -- --bare  # your own app URLs, no smoke run
- *   npm create agentic-playwright .                   # scaffold into the current directory
+ *   npm create agentic-playwright@latest . -- --demo         # try it: no questions, green in minutes
+ *   npm create agentic-playwright@latest .                   # interactive (3 questions)
+ *   npm create agentic-playwright@latest . -- --bare         # your own app, no demo
+ *   npm create agentic-playwright@latest my-tests -- --demo  # into ./my-tests
  *
- * Flags:
- *   --demo            Zero questions. Demo API (practicesoftwaretesting.com),
- *                     all AI rule trees, install deps + browser, run @smoke.
- *   --bare            Prompt for your app's URLs instead of the demo API.
- *   --yes             Accept all defaults for any question not answered by flags.
- *   --no-claude       Prune the Claude Code rule tree (.claude/, CLAUDE.md).
- *   --no-cursor       Prune the Cursor rule tree (.cursor/).
- *   --no-copilot      Prune the GitHub Copilot rule tree (.github instructions/prompts/skills).
+ *   `.` scaffolds into the current (empty) folder; a name creates that subfolder.
+ *   With npm, `--` passes the flags through npm to the initializer
+ *   (pnpm, yarn and bun do not need it).
+ *
+ * Mode (at most one):
+ *   --demo            No questions. Demo API (practicesoftwaretesting.com), both
+ *                     skill trees, install deps + browser, run the @smoke test.
+ *   --bare            Your own app: asks for its URLs and credentials, no smoke run.
+ *                     Add --yes for no questions (placeholders in env/.env.dev).
+ *
+ * AI rules (AGENTS.md always ships):
+ *   --no-claude       Leave out Claude Code: .claude/ and CLAUDE.md, which also
+ *                     removes the write-time hook and the commit-time scan.
+ *   --no-agents       Leave out the other agents (Codex, Cursor, GitHub Copilot, ...):
+ *                     .agents/ and .github/prompts/. With --no-claude, .agents/
+ *                     stays: AGENTS.md needs one skill tree.
+ *
+ * Skip steps:
  *   --skip-install    Do not run npm install (implies --skip-browsers, --skip-smoke).
  *   --skip-browsers   Do not download the Playwright browser.
  *   --skip-git        Do not run git init / initial commit.
  *   --skip-smoke      Do not run the @smoke verification test.
+ *
  *   --help            Show this help.
  */
 
@@ -98,22 +109,52 @@ function copyDir(src, dest) {
 
 // ------------------------------------------------------------------- args
 
-function parseArgs(argv) {
+// Flags npm keeps for itself when the `--` is forgotten
+// (`npm create agentic-playwright . --demo`): npm warns "Unknown cli config"
+// and hands each one to the initializer only as an npm_config_* variable
+// (`--demo` -> "true", `--no-claude` -> npm_config_claude=""). `yes` is not
+// recovered: npm's own `npm create --yes` sets npm_config_yes too.
+const NPM_SWALLOWED = [
+    'demo',
+    'bare',
+    'skip-install',
+    'skip-browsers',
+    'skip-git',
+    'skip-smoke',
+];
+const NPM_SWALLOWED_NEGATED = ['claude', 'agents'];
+
+function parseArgs(argv, env = process.env) {
     const flags = new Set();
     let dir;
     for (const a of argv) {
         if (a.startsWith('--')) flags.add(a.slice(2));
         else if (!dir) dir = a;
     }
-    return { dir, flags };
+    const recovered = [];
+    for (const name of NPM_SWALLOWED) {
+        const value = env[`npm_config_${name.replace(/-/g, '_')}`];
+        if (value === 'true' && !flags.has(name)) {
+            flags.add(name);
+            recovered.push(`--${name}`);
+        }
+    }
+    for (const name of NPM_SWALLOWED_NEGATED) {
+        const value = env[`npm_config_${name}`];
+        if ((value === '' || value === 'false') && !flags.has(`no-${name}`)) {
+            flags.add(`no-${name}`);
+            recovered.push(`--no-${name}`);
+        }
+    }
+    return { dir, flags, recovered };
 }
 
 function printHelp() {
-    const header = fs
-        .readFileSync(__filename, 'utf8')
-        .split('\n')
-        .slice(1, 25)
-        .filter((l) => l !== '/**' && l !== ' */')
+    // The help text is the header comment, up to its closing ` */`.
+    const lines = fs.readFileSync(__filename, 'utf8').split('\n');
+    const header = lines
+        .slice(1, lines.indexOf(' */'))
+        .filter((l) => l !== '/**')
         .map((l) => l.replace(/^ \* ?/, ''))
         .join('\n');
     console.log(header);
@@ -202,25 +243,40 @@ function pruneTree(projectDir, relPaths) {
     }
 }
 
+// AGENTS.md is every tool's Constitution (Claude Code imports it), so no
+// flag prunes it.
 const CLAUDE_PATHS = ['.claude', 'CLAUDE.md'];
-const CURSOR_PATHS = ['.cursor'];
-const COPILOT_PATHS = [
-    '.github/instructions',
-    '.github/prompts',
-    '.github/skills',
-    '.github/copilot-instructions.md',
-];
+// The other agents' side: the generated skills and the Copilot PR-review prompt.
+const AGENTS_PATHS = ['.agents', '.github/prompts'];
+// v1 per-tool flags: still accepted so old scripts keep working, prune nothing.
+const DEPRECATED_FLAGS = ['no-copilot', 'no-cursor'];
 
 // ------------------------------------------------------------------- main
 
 async function main() {
-    const { dir, flags } = parseArgs(process.argv.slice(2));
+    const { dir, flags, recovered } = parseArgs(process.argv.slice(2));
 
     printBrand();
 
-    if (flags.has('help') || !dir) {
+    if (flags.has('help')) {
         printHelp();
-        process.exit(dir ? 0 : 1);
+        process.exit(0);
+    }
+    if (!dir) {
+        printHelp();
+        process.exit(1);
+    }
+    if (recovered.length) {
+        log(
+            `  Note: npm kept ${recovered.join(' ')} for itself; applied anyway. Put \`--\` before the flags: npm create agentic-playwright@latest ${dir} -- ${recovered.join(' ')}`
+        );
+    }
+    for (const name of DEPRECATED_FLAGS) {
+        if (flags.has(name)) {
+            log(
+                `  Note: --${name} is deprecated and prunes nothing; use --no-agents to leave out .agents/ (Codex, Cursor, Copilot, ...).`
+            );
+        }
     }
     if (!fs.existsSync(TEMPLATE_DIR)) {
         fail(
@@ -251,8 +307,7 @@ async function main() {
 
     // ---- gather answers -------------------------------------------------
     let keepClaude = !flags.has('no-claude');
-    let keepCursor = !flags.has('no-cursor');
-    let keepCopilot = !flags.has('no-copilot');
+    let keepAgents = !flags.has('no-agents');
     let env = { ...DEMO_ENV };
     let doInstall = !flags.has('skip-install');
     let doBrowsers = doInstall && !flags.has('skip-browsers');
@@ -286,24 +341,25 @@ async function main() {
 
         keepClaude =
             keepClaude &&
-            (await askYesNo(io, '1/4 Include Claude Code rules?', true));
-        keepCursor =
-            keepCursor &&
-            (await askYesNo(io, '2/4 Include Cursor rules?', true));
-        keepCopilot =
-            keepCopilot &&
-            (await askYesNo(io, '3/4 Include GitHub Copilot rules?', true));
+            (await askYesNo(io, '1/3 Include Claude Code (.claude/)?', true));
+        keepAgents =
+            keepAgents &&
+            (await askYesNo(
+                io,
+                '2/3 Include the other agents: Codex, Cursor, GitHub Copilot, ... (.agents/)?',
+                true
+            ));
 
         if (bare) {
-            log('4/4 Your application under test:');
+            log('3/3 Your application under test:');
             env = {
                 APP_URL: await ask(
-                    rl,
+                    io,
                     '    APP_URL',
                     'https://your-app.example.com'
                 ),
                 API_URL: await ask(
-                    rl,
+                    io,
                     '    API_URL',
                     'https://api.your-app.example.com'
                 ),
@@ -313,28 +369,28 @@ async function main() {
         } else {
             const useDemo = await askYesNo(
                 io,
-                '4/4 Use the public demo API (practicesoftwaretesting.com) so tests run green immediately?',
+                '3/3 Use the public demo API (practicesoftwaretesting.com) so tests run green immediately?',
                 true
             );
             if (!useDemo) {
                 env = {
                     APP_URL: await ask(
-                        rl,
+                        io,
                         '    APP_URL',
                         'https://your-app.example.com'
                     ),
                     API_URL: await ask(
-                        rl,
+                        io,
                         '    API_URL',
                         'https://api.your-app.example.com'
                     ),
                     APP_EMAIL: await ask(
-                        rl,
+                        io,
                         '    APP_EMAIL',
                         'user@example.com'
                     ),
                     APP_PASSWORD: await ask(
-                        rl,
+                        io,
                         '    APP_PASSWORD',
                         'change-me'
                     ),
@@ -365,24 +421,30 @@ async function main() {
     stampReadmeTitle(projectDir, projectName);
     writeEnvFile(projectDir, env);
 
+    // AGENTS.md always ships and its Skills Index points at a skill tree, so
+    // at least one tree must stay: pruning both would leave every pointer
+    // dangling and the gates red. Keep .agents/ in that case.
+    if (!keepClaude && !keepAgents) {
+        keepAgents = true;
+        log(
+            '  Note: AGENTS.md needs one skill tree; keeping .agents/ because .claude/ is pruned.'
+        );
+    }
+
     const pruned = [];
     if (!keepClaude) {
         pruneTree(projectDir, CLAUDE_PATHS);
         pruned.push('Claude Code');
         log(
-            '  Note: pruning Claude Code also removes the write-time enforcement hook (it lives in .claude/).'
+            '  Note: pruning Claude Code also removes the Constitution hook and its commit-time scan (both live in .claude/).'
         );
     }
-    if (!keepCursor) {
-        pruneTree(projectDir, CURSOR_PATHS);
-        pruned.push('Cursor');
-    }
-    if (!keepCopilot) {
-        pruneTree(projectDir, COPILOT_PATHS);
-        pruned.push('Copilot');
+    if (!keepAgents) {
+        pruneTree(projectDir, AGENTS_PATHS);
+        pruned.push('the other agents (.agents/, .github/prompts/)');
     }
     if (pruned.length) {
-        log(`  Pruned rule trees: ${pruned.join(', ')} (gates tolerate this).`);
+        log(`  Pruned: ${pruned.join(', ')} (the gates tolerate this).`);
     }
 
     // ---- git ------------------------------------------------------------
@@ -452,14 +514,21 @@ async function main() {
     if (dir !== '.') log(`  cd ${dir}`);
     if (!doInstall) log('  npm install && npx playwright install chromium');
     log('  npx playwright test          # run the example suite');
-    log('  npm run check:skills         # verify the AI rule trees');
+    log('  npm run check:skills         # verify the AI rules layer');
     log('\nAI assistants pick up their rules automatically:');
-    if (keepClaude) log('  Claude Code — CLAUDE.md + .claude/skills/');
-    if (keepCursor) log('  Cursor — .cursor/rules/ + .cursor/skills/');
-    if (keepCopilot)
-        log('  Copilot — .github/copilot-instructions.md + instructions/');
+    if (keepClaude)
+        log('  Claude Code — CLAUDE.md (imports AGENTS.md) + .claude/skills/');
+    if (keepAgents) {
+        log(
+            '  Codex, Cursor, GitHub Copilot, ... — AGENTS.md + .agents/skills/'
+        );
+        log('  Copilot PR review — .github/prompts/pr-reviewer.prompt.md');
+    }
     log('\nExploring UI before writing selectors (mandatory workflow):');
     log('  npm run setup:check          # links the playwright-cli wrapper');
+    log(
+        "  npm run playwright-cli:install-browsers  # Chromium for playwright-cli's own cache"
+    );
     log('\nDocs: https://github.com/idavidov13/agentic-playwright');
     log('----------------------------------------------------------------');
 }
