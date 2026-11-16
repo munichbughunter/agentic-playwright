@@ -4,6 +4,36 @@ All notable changes to Agentic Playwright are documented here. Entries are liste
 
 ---
 
+## v2.0.3 -- Scope Qualifiers Restored, Test Isolation a MUST -- 2026-11-13
+
+### Rules layer
+
+- **Test Isolation is a MUST** (was SHOULD): the Constitution now has 15 MUST, 4 SHOULD and 17 WON'T rules. The `pr-reviewer` checklist gains a row for it (31 rows).
+- **A CSS locator is a confirmed exception**, not a "last resort" tier: when no semantic locator fits, the agent asks for a test id first. A CSS locator ships only after the human confirms the app cannot take one, with the reason on the line in a `playwright/no-raw-locators` disable comment.
+- **No documented API contract: the agent asks first.** Live capture starts only once the human confirms no document exists, and stays flagged.
+- **An unreachable app stops the work** on a UI message enum; the `// FIXME: unverified` placeholder is gone.
+- **Scope qualifiers restored on four Constitution rows**: Imports (spec files), No Manual Instantiation (test files), No Hardcoded Test Content (test-created content) and JSDoc on Actions (page objects). No Magic Numbers names `playwright.config.ts` as a home for constants.
+- `ci-replay` no longer suggests `console.log`, which `npm run lint` rejects; the `helpers` example carries the JSDoc its own rule requires.
+
+### Docs
+
+- The README API example is the real `tests/app/api/login.spec.ts` test (enum endpoint, env credentials) instead of a hardcoded path, and the selector sections match the CSS rule.
+
+---
+
+## v2.0.2 -- ArchQA Colors, a Hero Image That Matches the Command -- 2026-11-13
+
+### Initializer
+
+- **The ArchQA wordmark prints in the brand's sage green** (`#7cae7a`), fading down from a light tint of it, instead of cyan to blue: the exact colors on a 24-bit terminal (`COLORTERM=truecolor` or `24bit`), the nearest 256-color shades elsewhere. Without a TTY or with `NO_COLOR` it stays plain.
+
+### Docs
+
+- **`assets/hero-terminal.svg` shows the documented command**, `npm create agentic-playwright@latest . -- --demo`, run inside `~/my-tests`, and what the initializer prints for it: the ArchQA wordmark in the same sage fade, the five setup steps, `3 passed`, the ready line and the two AI-rules lines, on the brand's dark slate with pale-yellow accents. The image ships in the template, so every project scaffolded from this version carries it in its README.
+- The package README shows the same image on npmjs.com.
+
+---
+
 ## v2.0.1 -- Two AI Flags, Clearer Commands -- 2026-11-03
 
 ### Initializer
