@@ -48,13 +48,13 @@ Rules for every agent in this repository. Skills hold the detail; load the one t
 - **No Empty-Body-Only 400**: per-field omission and invalid-type `for...of` tests.
 - **No Feedback-Less POM**: form and CRUD page objects have success, error and validation selectors.
 - **No Substitute UI Exploration**: no IDE or MCP browser, no `codegen`; only `playwright-cli`.
-- **No Silent Coverage Drops**: every documented status code has a test or a `test.skip` with `// FIXME`.
+- **No Silent Coverage Drops**: every documented status code has a test, a `test.skip` with `// FIXME` or a human-set `// SCOPE` line.
 - **No JSON Static Data**: `test-data/static/**` is `.ts` with `as const`.
 
 ## Workflow
 
 - **Proceed**: load `ai-native-workflow` first on every non-trivial task; it routes, explores and stops at a confidence-scored proposal before any edit. One-line fix, typo or single import: direct mode, verify the premise, apply, report.
-- **Verify**: `npm run lint`, then `npx playwright test <affected files>`; red means `debugging`, never a skipped or loosened test.
+- **Verify**: `npm run lint`, then `npx playwright test <affected files>`; red means `debugging`, never a loosened test; quarantine needs human approval, owner and expiry.
 - **Commit**: ask first; one verified task per commit, Conventional Commit subject; never `test.only` or a real env file.
 
 ## Skills Index

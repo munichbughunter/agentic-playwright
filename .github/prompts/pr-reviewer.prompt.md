@@ -118,7 +118,7 @@ Check at minimum:
 - **Contract fidelity (STRICT).** Schemas mirror the documented OpenAPI/Swagger contract. When live API disagrees with the contract, the API is the bug, NEVER the schema. Flag as 🔴 any schema-loosening (`z.strictObject`→`z.object`; added `.optional()`/`.nullable()`/`.passthrough()`/`.catchall()` or widened type to swallow a runtime value; deleted documented field; precise validator → looser) even if it makes a test pass. Sanctioned fix: `test.skip` + `// FIXME: <ticket>`.
 - **Sibling consistency** — divergence from the nearest file of the same kind is a finding.
 - **Real bugs** — logic errors, wrong assertions, `.find()` on possibly-empty response, off-by-one, copy-paste leftovers (stale qase IDs, wrong endpoint).
-- **Coverage gaps** + **scope creep**.
+- **Coverage gaps** — every documented status code has a test, a `test.skip` + `// FIXME`, or a `// SCOPE` line naming the rows and who cut them; a `// SCOPE` line with no source is a finding, and so is a test for an undocumented code or body without `// OBSERVED` — + **scope creep**.
 
 ### Phase 6 — Constitution checklist (MANDATORY GATE)
 
@@ -128,7 +128,7 @@ Check at minimum:
 .agents/skills/pr-reviewer/scripts/scan-constitution.sh "$BASE"
 ```
 
-Then read `.agents/skills/pr-reviewer/references/constitution-checklist.md` and walk the judgment items (coverage gaps, sibling divergence, schema-vs-contract fidelity, cleanup hooks, return types, feedback-message selectors) against the three-dot diff. Record ✅/❌/➖ with `file:line`. Every ❌ becomes a report finding at its tier. Couldn't evaluate (env) → say so, don't mark ✅.
+Then read `.agents/skills/pr-reviewer/references/constitution-checklist.md` and walk the judgment items (coverage gaps, sibling divergence, schema-vs-contract fidelity, cleanup hooks, return types, feedback-message selectors, quarantine approval) against the three-dot diff. Record ✅/❌/➖ with `file:line`. Every ❌ becomes a report finding at its tier. Couldn't evaluate (env) → say so, don't mark ✅.
 
 ### Phase 7 — Report
 
@@ -156,3 +156,4 @@ Only if Phase 8 changed files and re-verification passes. Never commit without e
 - Runtime ≠ contract: report mismatches via `test.skip` + `// FIXME`, never relax the schema.
 - Env failures aren't branch failures.
 - A comment/test-name vs code gap is itself a finding.
+- Flag quarantine without human approval, a named owner, expiry and investigation evidence.
